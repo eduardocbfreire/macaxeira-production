@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # Configuração básica e sessão
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Custeio variável da macaxeira",
+    page_title="Macaxeira – Custeio variável e preço",
     layout="wide"
 )
 
@@ -48,6 +48,11 @@ def coletar_custos_etapa(etapa_id: str, titulo: str, itens: list) -> float:
     total = 0.0
     st.markdown(f"#### {titulo}")
 
+    st.caption(
+        "Preencha, para cada item, **quanto você usa** (quantidade) e **quanto paga por unidade** "
+        "(custo unitário em R$). O sistema faz a conta do total automaticamente."
+    )
+
     for i, item in enumerate(itens):
         item_id = f"{etapa_id}_{i}_{slugify(item['nome'])}"
 
@@ -59,7 +64,8 @@ def coletar_custos_etapa(etapa_id: str, titulo: str, itens: list) -> float:
                 f"Quantidade ({item.get('unidade_exemplo', 'unidade')})",
                 min_value=0.0,
                 step=1.0,
-                key=f"{item_id}_qtd"
+                key=f"{item_id}_qtd",
+                help="Informe quanto desse item você usa no ciclo de produção considerado."
             )
         with col2:
             _ = st.text_input(
@@ -72,19 +78,22 @@ def coletar_custos_etapa(etapa_id: str, titulo: str, itens: list) -> float:
                 "Custo unitário (R$)",
                 min_value=0.0,
                 step=0.01,
-                key=f"{item_id}_custo_unit"
+                key=f"{item_id}_custo_unit",
+                help="Quanto custa **uma unidade** desse item (por kg, por diária, por hora, etc.)."
             )
 
         subtotal = qtd * custo_unit
         st.write(f"Custo deste item: **R$ {subtotal:,.2f}**")
-        total += subtotal
         st.markdown("---")
+
+        total += subtotal
 
     outros = st.number_input(
         f"Outros custos variáveis de {titulo.lower()} (total, em R$)",
         min_value=0.0,
         step=10.0,
-        key=f"{etapa_id}_outros"
+        key=f"{etapa_id}_outros",
+        help="Use este campo se tiver algum gasto variável que não entrou nos itens acima."
     )
     total += outros
 
@@ -99,7 +108,20 @@ def coletar_custos_etapa(etapa_id: str, titulo: str, itens: list) -> float:
 def pagina_custeio_variavel():
     st.header("1. Custeio variável da macaxeira – do plantio à venda")
 
+    with st.expander("O que esta aba faz? (clique para ver)", expanded=True):
+        st.write(
+            "Nesta parte, o sistema soma **todos os gastos que aumentam quando você produz mais** "
+            "macaxeira (sementes, adubos, diárias, embalagens, energia, frete etc.).\n\n"
+            "No final, ele mostra **quanto custa, em média, produzir 1 kg de macaxeira pronta para vender**. "
+            "Esse é o **custo variável por kg**, que será usado depois para simulação e formação do preço de venda."
+        )
+
     st.subheader("Dados de produção do ciclo")
+    st.caption(
+        "Aqui você informa **quanto está produzindo** e **quanto perde** no caminho "
+        "(no campo e no beneficiamento). O sistema usa isso para calcular quantos kg realmente chegam para venda."
+    )
+
     col1, col2 = st.columns(2)
     with col1:
         area_ha = st.number_input(
@@ -107,7 +129,8 @@ def pagina_custeio_variavel():
             min_value=0.0,
             step=0.1,
             value=st.session_state["area_ha"] or 1.0,
-            key="area_ha_input"
+            key="area_ha_input",
+            help="Informe quantos hectares de macaxeira foram plantados."
         )
     with col2:
         produtividade_kg_ha = st.number_input(
@@ -115,7 +138,8 @@ def pagina_custeio_variavel():
             min_value=0.0,
             step=100.0,
             value=st.session_state["produtividade_kg_ha"] or 20000.0,
-            key="produtividade_kg_ha_input"
+            key="produtividade_kg_ha_input",
+            help="Quantos kg de raiz você espera colher, em média, por hectare."
         )
 
     col3, col4 = st.columns(2)
@@ -126,7 +150,8 @@ def pagina_custeio_variavel():
             max_value=100.0,
             step=1.0,
             value=st.session_state["perda_campo_percent"] or 5.0,
-            key="perda_campo_input"
+            key="perda_campo_input",
+            help="Percentual que se perde no campo (raízes danificadas, que ficam no solo, etc.)."
         )
     with col4:
         perda_benef_percent = st.number_input(
@@ -135,14 +160,23 @@ def pagina_custeio_variavel():
             max_value=100.0,
             step=1.0,
             value=st.session_state["perda_benef_percent"] or 20.0,
-            key="perda_benef_input"
+            key="perda_benef_input",
+            help="Percentual que se perde no descasque, cortes, lavagens, aparas, etc."
         )
 
     st.markdown("---")
 
     st.subheader("Custos variáveis por etapa")
+    st.caption(
+        "Preencha, em cada etapa, os **gastos que aumentam quando você produz mais**. "
+        "Gastos fixos (como aluguel, um salário fixo mensal) não entram aqui."
+    )
 
     with st.expander("Etapa 1 – Plantio", expanded=False):
+        st.write(
+            "Inclua aqui os gastos ligados ao **início da lavoura**: limpeza, preparo do solo, "
+            "mudas, adubação de fundação e mão de obra dessa fase."
+        )
         itens_plantio = [
             {
                 "nome": "Mudas / manivas para plantio",
@@ -164,6 +198,10 @@ def pagina_custeio_variavel():
         custo_plantio = coletar_custos_etapa("plantio", "Plantio", itens_plantio)
 
     with st.expander("Etapa 2 – Condução da cultura", expanded=False):
+        st.write(
+            "Aqui entram os gastos para **cuidar da lavoura até a colheita**: adubação de cobertura, "
+            "cultivo do solo, trituração e manejo em geral."
+        )
         itens_conducao = [
             {
                 "nome": "Adubação de cobertura 1",
@@ -189,6 +227,10 @@ def pagina_custeio_variavel():
         custo_conducao = coletar_custos_etapa("conducao", "Condução da cultura", itens_conducao)
 
     with st.expander("Etapa 3 – Colheita e pós-colheita (da lavoura até a expedição)", expanded=False):
+        st.write(
+            "Aqui entram os gastos para **colher, beneficiar e entregar** a macaxeira: "
+            "mão de obra, embalagens, água, produtos de limpeza, energia, frete etc."
+        )
         itens_pos = [
             {
                 "nome": "Mão de obra de colheita",
@@ -251,6 +293,10 @@ def pagina_custeio_variavel():
         st.success(
             f"Custo variável unitário aproximado: **R$ {custo_variavel_unitario:,.4f} por kg de macaxeira vendável**"
         )
+        st.caption(
+            "Isso significa: em média, **produzir 1 kg pronto para venda custa esse valor em gastos que variam com a produção**. "
+            "Esse número será a base para a simulação de cenários e para calcular o preço de venda."
+        )
 
         # Guarda na sessão para usar nas outras páginas
         st.session_state["custo_variavel_unitario"] = custo_variavel_unitario
@@ -270,26 +316,38 @@ def pagina_custeio_variavel():
 def pagina_monte_carlo():
     st.header("2. Simulação de cenários (Monte Carlo)")
 
+    with st.expander("O que esta aba faz? (clique para ver)", expanded=True):
+        st.write(
+            "Aqui o sistema faz **vários cenários possíveis** para a sua produção, mudando três coisas:\n"
+            "- produtividade (kg/ha),\n"
+            "- preço de venda (R$/kg),\n"
+            "- custo variável por kg.\n\n"
+            "Em cada cenário ele calcula **quanto sobraria (margem) para pagar custos fixos e lucro**. "
+            "Assim você enxerga o **risco de prejuízo** e a faixa provável de resultado."
+        )
+
     st.write(
-        "Aqui vamos simular cenários possíveis de resultado, "
-        "variando produtividade, preço de venda e custo variável unitário."
+        "Preencha abaixo os valores **mínimo, mais provável e máximo** para produtividade, preço e custo variável. "
+        "Com isso o app cria muitos cenários aleatórios entre esses valores."
     )
 
     col1, col2 = st.columns(2)
     with col1:
         n_sim = st.number_input(
-            "Número de simulações",
+            "Número de simulações (quantidade de cenários gerados)",
             min_value=1000,
             max_value=50000,
             step=1000,
-            value=10000
+            value=10000,
+            help="Quanto maior o número, mais Cenários o sistema cria. 10.000 já costuma ser um bom valor."
         )
     with col2:
         area_ha_sim = st.number_input(
             "Área considerada na simulação (ha)",
             min_value=0.0,
             step=0.1,
-            value=st.session_state["area_ha"] or 1.0
+            value=st.session_state["area_ha"] or 1.0,
+            help="Quantos hectares de macaxeira você quer considerar nesses cenários."
         )
 
     st.markdown("#### Produtividade (kg/ha) – distribuição triangular")
@@ -299,21 +357,24 @@ def pagina_monte_carlo():
             "Produtividade mínima (kg/ha)",
             min_value=0.0,
             step=100.0,
-            value=15000.0
+            value=15000.0,
+            help="Cenário ruim: quantos kg/ha se a safra for fraca."
         )
     with col_p2:
         prod_most = st.number_input(
             "Produtividade mais provável (kg/ha)",
             min_value=0.0,
             step=100.0,
-            value=st.session_state["produtividade_kg_ha"] or 20000.0
+            value=st.session_state["produtividade_kg_ha"] or 20000.0,
+            help="Valor que você acha mais realista para a produtividade."
         )
     with col_p3:
         prod_max = st.number_input(
             "Produtividade máxima (kg/ha)",
             min_value=0.0,
             step=100.0,
-            value=25000.0
+            value=25000.0,
+            help="Cenário muito bom: quantos kg/ha se tudo der certo."
         )
 
     st.markdown("#### Preço de venda da macaxeira (R$/kg) – distribuição triangular")
@@ -323,21 +384,24 @@ def pagina_monte_carlo():
             "Preço mínimo (R$/kg)",
             min_value=0.0,
             step=0.10,
-            value=2.00
+            value=2.00,
+            help="Preço em um cenário ruim de mercado."
         )
     with col_pre2:
         preco_most = st.number_input(
             "Preço mais provável (R$/kg)",
             min_value=0.0,
             step=0.10,
-            value=2.50
+            value=2.50,
+            help="Preço que você acredita ser o mais comum."
         )
     with col_pre3:
         preco_max = st.number_input(
             "Preço máximo (R$/kg)",
             min_value=0.0,
             step=0.10,
-            value=3.00
+            value=3.00,
+            help="Preço em um cenário muito favorável."
         )
 
     st.markdown("#### Custo variável unitário (R$/kg) – distribuição triangular")
@@ -349,21 +413,24 @@ def pagina_monte_carlo():
             "Custo variável mínimo (R$/kg)",
             min_value=0.0,
             step=0.05,
-            value=float(max(cvu_base * 0.8, 0.0))
+            value=float(max(cvu_base * 0.8, 0.0)),
+            help="Cenário em que os gastos variáveis saem mais baratos."
         )
     with col_c2:
         cvu_most = st.number_input(
             "Custo variável mais provável (R$/kg)",
             min_value=0.0,
             step=0.05,
-            value=float(cvu_base)
+            value=float(cvu_base),
+            help="Custo variável por kg que você considera mais provável."
         )
     with col_c3:
         cvu_max = st.number_input(
             "Custo variável máximo (R$/kg)",
             min_value=0.0,
             step=0.05,
-            value=float(cvu_base * 1.2)
+            value=float(cvu_base * 1.2),
+            help="Cenário em que o custo variável fica mais caro que o normal."
         )
 
     if st.button("Rodar simulação"):
@@ -400,15 +467,18 @@ def pagina_monte_carlo():
             "Margem_unit_R$/kg": margem_unitaria,
         })
 
+        margem_total_media = df["Margem_total_R$"].mean()
+        prob_prejuizo = (df["Margem_total_R$"] < 0).mean() * 100
+        margem_unit_media = df["Margem_unit_R$/kg"].mean()
+
         st.markdown("### Resultados resumidos da simulação")
         col_r1, col_r2, col_r3 = st.columns(3)
         with col_r1:
             st.metric(
                 "Margem total média (R$)",
-                f"{df['Margem_total_R$'].mean():,.2f}"
+                f"{margem_total_media:,.2f}"
             )
         with col_r2:
-            prob_prejuizo = (df["Margem_total_R$"] < 0).mean() * 100
             st.metric(
                 "Probabilidade de margem total negativa",
                 f"{prob_prejuizo:,.1f} %"
@@ -416,10 +486,16 @@ def pagina_monte_carlo():
         with col_r3:
             st.metric(
                 "Margem unitária média (R$/kg)",
-                f"{df['Margem_unit_R$/kg'].mean():,.4f}"
+                f"{margem_unit_media:,.4f}"
             )
 
-        st.markdown("#### Estatísticas principais")
+        st.caption(
+            f"Em linguagem simples: em média, a atividade deixaria cerca de **R$ {margem_total_media:,.2f}** "
+            f"para pagar custos fixos e lucro. Em aproximadamente **{prob_prejuizo:,.1f}%** dos cenários, "
+            "a margem fica negativa (ou seja, **não sobra nada para fixos e lucro**)."
+        )
+
+        st.markdown("#### Estatísticas principais (valores simulados)")
         st.dataframe(
             df[["Receita_total_R$", "Custo_var_total_R$", "Margem_total_R$", "Margem_unit_R$/kg"]]
             .describe()
@@ -430,8 +506,13 @@ def pagina_monte_carlo():
         fig, ax = plt.subplots()
         ax.hist(df["Margem_total_R$"], bins=30)
         ax.set_xlabel("Margem total (R$)")
-        ax.set_ylabel("Frequência")
+        ax.set_ylabel("Quantidade de cenários")
         st.pyplot(fig)
+
+        st.caption(
+            "O gráfico mostra **quantos cenários** ficaram em cada faixa de resultado. "
+            "Valores mais à direita significam margens maiores; valores à esquerda, margens menores ou negativas."
+        )
 
 
 # ---------------------------------------------------------
@@ -440,14 +521,24 @@ def pagina_monte_carlo():
 def pagina_precificacao():
     st.header("3. Precificação com base em custeio variável e markup")
 
-    st.write(
-        "Nesta etapa vamos sugerir um preço de venda por kg de macaxeira, "
-        "considerando o custo variável, os custos fixos que você quer cobrir "
-        "e o lucro desejado."
-    )
+    with st.expander("O que esta aba faz? (clique para ver)", expanded=True):
+        st.write(
+            "Aqui o objetivo é **chegar em um preço de venda por kg** que:\n"
+            "- pague o **custo variável por kg**;\n"
+            "- ajude a pagar os **custos fixos** que você quer cobrir com essa produção;\n"
+            "- gere o **lucro desejado**;\n"
+            "- considere **impostos** e outras despesas sobre o faturamento.\n\n"
+            "O cálculo usa a ideia de **markup**: o preço é um múltiplo do custo variável, "
+            "ajustado para cobrir tudo isso."
+        )
 
     # Custo variável unitário
     st.subheader("Custo variável unitário")
+    st.caption(
+        "Se você já fez o custeio na primeira aba, pode reaproveitar o valor calculado lá. "
+        "Se preferir, pode informar um valor manualmente."
+    )
+
     usa_cvu_calculado = False
     if st.session_state["custo_variavel_unitario"] is not None:
         usa_cvu_calculado = st.checkbox(
@@ -463,26 +554,35 @@ def pagina_precificacao():
             "Informe o custo variável unitário (R$/kg)",
             min_value=0.0,
             step=0.01,
-            value=1.50
+            value=1.50,
+            help="Se não usou a primeira aba, informe aqui o custo variável médio por kg."
         )
 
     st.markdown("---")
 
     st.subheader("Custos fixos e lucro desejado para esta produção")
+    st.caption(
+        "Aqui você diz **quanto de custo fixo** quer cobrir com esta produção "
+        "(ex.: parte do salário fixo, energia mínima, aluguel etc.) e "
+        "**quanto de lucro** deseja obter."
+    )
+
     col_cf1, col_cf2 = st.columns(2)
     with col_cf1:
         custos_fixos_totais = st.number_input(
             "Total de custos fixos que deseja cobrir com esta produção (R$)",
             min_value=0.0,
             step=100.0,
-            value=0.0
+            value=0.0,
+            help="Some os custos fixos que você deseja que esta produção ajude a pagar."
         )
     with col_cf2:
         lucro_desejado_total = st.number_input(
             "Lucro total desejado com esta produção (R$)",
             min_value=0.0,
             step=100.0,
-            value=0.0
+            value=0.0,
+            help="Quanto você gostaria de ganhar de lucro com essa produção."
         )
 
     volume_padrao = st.session_state["producao_final_kg"] or 0.0
@@ -490,12 +590,18 @@ def pagina_precificacao():
         "Volume previsto de venda desta produção (kg)",
         min_value=0.0,
         step=10.0,
-        value=float(volume_padrao)
+        value=float(volume_padrao),
+        help="Quantos kg de macaxeira você espera vender dessa produção."
     )
 
     st.markdown("---")
 
     st.subheader("Percentuais sobre o faturamento (despesas variáveis e impostos)")
+    st.caption(
+        "Informe, em percentual, **quanto do preço de venda** é consumido por impostos "
+        "e despesas variáveis comerciais (frete, comissão, taxas de cartão etc.)."
+    )
+
     col_tx1, col_tx2 = st.columns(2)
     with col_tx1:
         impostos_percent = st.number_input(
@@ -503,7 +609,8 @@ def pagina_precificacao():
             min_value=0.0,
             max_value=100.0,
             step=0.5,
-            value=0.0
+            value=0.0,
+            help="Percentual de impostos cobrados sobre o faturamento (ex.: 5%, 10%)."
         )
     with col_tx2:
         desp_var_percent = st.number_input(
@@ -511,7 +618,8 @@ def pagina_precificacao():
             min_value=0.0,
             max_value=100.0,
             step=0.5,
-            value=0.0
+            value=0.0,
+            help="Percentual de gastos ligados à venda (fretes que variam, comissões, taxas, etc.)."
         )
 
     if st.button("Calcular preço com markup"):
@@ -568,12 +676,17 @@ def pagina_precificacao():
                 f"{mc_unit_real:,.4f}"
             )
 
+        st.caption(
+            f"Isso significa que, para cada kg vendido a esse preço, **sobra cerca de R$ {mc_unit_real:,.4f}** "
+            "de margem para pagar os custos fixos e gerar lucro."
+        )
+
         st.markdown("#### Decomposição unitária do preço (por kg)")
         st.write(f"- Custo variável unitário: **R$ {cvu:,.4f}**")
         st.write(f"- Impostos: **R$ {impostos_unit:,.4f}**")
         st.write(f"- Despesas variáveis comerciais: **R$ {desp_var_unit:,.4f}**")
         st.write(f"- Custo fixo unitário (meta): **R$ {custo_fixo_unit:,.4f}**")
-        st.write(f"- Lucro unitário desejado: **R$ {lucro_unit_desejado:,.4f}**")
+        st.write(f"- Lucro unitário desejado (meta): **R$ {lucro_unit_desejado:,.4f}**")
 
         st.markdown("#### Resultado global estimado para a produção")
         col_g1, col_g2 = st.columns(2)
@@ -596,7 +709,8 @@ def pagina_precificacao():
         else:
             st.warning(
                 "Com esse preço, o lucro estimado ficou abaixo do lucro desejado. "
-                "Você pode ajustar o lucro desejado, o volume previsto ou rever as porcentagens."
+                "Você pode ajustar o lucro desejado, o volume previsto ou rever as porcentagens "
+                "de impostos e despesas variáveis."
             )
 
 
@@ -607,6 +721,12 @@ def main():
     init_session_state()
 
     st.sidebar.title("Menu")
+    st.sidebar.write(
+        "Use o menu abaixo para navegar:\n\n"
+        "1. **Custeio variável** – calcula o custo variável por kg.\n"
+        "2. **Simulação Monte Carlo** – vê o risco e a variação do resultado.\n"
+        "3. **Precificação com markup** – sugere um preço de venda por kg."
+    )
     opcao = st.sidebar.radio(
         "Escolha a funcionalidade:",
         (
