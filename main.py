@@ -722,10 +722,10 @@ def main():
 
     st.sidebar.title("Menu")
     st.sidebar.write(
-        "Use o menu abaixo para navegar:\n\n"
-        "1. **Custeio variável** – calcula o custo variável por kg.\n"
-        "2. **Simulação Monte Carlo** – vê o risco e a variação do resultado.\n"
-        "3. **Precificação com markup** – sugere um preço de venda por kg."
+        "Use o menu abaixo para navegar\n\n"
+        "1. **Custeio variável:** calcula o custo variável por kg.\n"
+        "2. **Simulação Monte Carlo:** vê o risco e a variação do resultado.\n"
+        "3. **Precificação com markup:** sugere um preço de venda por kg."
     )
     opcao = st.sidebar.radio(
         "Escolha a funcionalidade:",
